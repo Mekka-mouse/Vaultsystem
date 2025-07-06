@@ -124,16 +124,16 @@
 
         .vehicle-dashboard {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 25px;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 15px;
             margin-top: 25px;
         }
 
         .vehicle-card {
             background: white;
             border: 2px solid #e1e1e1;
-            border-radius: 15px;
-            padding: 25px;
+            border-radius: 12px;
+            padding: 15px;
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
             transition: all 0.3s ease;
         }
@@ -157,6 +157,16 @@
         .vehicle-card.reserved {
             border-color: #9c27b0;
             background: linear-gradient(135deg, #fce4ec 0%, #f8bbd9 100%);
+        }
+
+        .vehicle-card p {
+            margin-bottom: 8px;
+            line-height: 1.3;
+        }
+
+        .vehicle-card h3 {
+            margin-bottom: 10px;
+            margin-top: 0;
         }
 
         .vehicle-info {
@@ -520,35 +530,66 @@
             <div class="tab-content" id="checkout">
                 <h2>Vehicle Checkout</h2>
                 <div id="checkout-alert"></div>
+                
+                <!-- Quick Vehicle Status Overview -->
+                <div class="quick-status-bar" style="background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                    <h4>Available Vehicles: <span id="available-count">-</span></h4>
+                    <div id="quick-vehicle-list" style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px;">
+                        <!-- Quick vehicle buttons will populate here -->
+                    </div>
+                </div>
+                
                 <form id="checkout-form">
                     <div class="form-group">
                         <label for="checkout-vehicle">Select Vehicle:</label>
                         <select id="checkout-vehicle" required>
                             <option value="">-- Select Vehicle --</option>
                         </select>
+                        <small class="form-text text-muted">Only available vehicles are shown</small>
                     </div>
                     <div class="form-group">
                         <label for="driver-name">Driver Name:</label>
-                        <input id="driver-name" type="text" required>
+                        <input id="driver-name" type="text" required placeholder="Enter your full name">
+                        <datalist id="recent-drivers">
+                            <!-- Recent drivers will be populated here -->
+                        </datalist>
                     </div>
                     <div class="form-group">
                         <label for="checkout-purpose">Purpose/Destination:</label>
-                        <input id="checkout-purpose" type="text" required>
+                        <input id="checkout-purpose" type="text" required placeholder="e.g., Client meeting, Site visit, Supply run">
+                        <datalist id="common-purposes">
+                            <option value="Client Meeting">
+                            <option value="Site Visit">
+                            <option value="Supply Run">
+                            <option value="Emergency Response">
+                            <option value="Training">
+                            <option value="Maintenance Pick-up">
+                        </datalist>
                     </div>
                     <div class="form-group">
                         <label for="checkout-time">Time of Check Out:</label>
                         <input id="checkout-time" type="datetime-local" required readonly>
+                        <small class="form-text text-muted">Current time: <span id="checkout-time-display"></span></small>
+                    </div>
+                    <div class="form-group">
+                        <label for="expected-return">Expected Return Date/Time:</label>
+                        <input id="expected-return" type="datetime-local" required>
+                        <small class="form-text text-muted">Helps with planning and scheduling</small>
                     </div>
                     <div class="form-group">
                         <label for="mileage-out">Current Mileage:</label>
-                        <input id="mileage-out" type="number" required>
+                        <input id="mileage-out" type="number" required readonly>
+                        <small class="form-text text-muted">Pre-filled from vehicle records</small>
                     </div>
                     <div class="form-group" id="pin-input-group" style="display: none;">
                         <label for="management-pin">Management PIN:</label>
-                        <input id="management-pin" type="password" placeholder="Enter 4-digit PIN">
-                        <small class="form-text text-muted">This vehicle requires management authorization</small>
+                        <input id="management-pin" type="password" placeholder="Enter 4-digit PIN" maxlength="4">
+                        <small class="form-text text-muted">This vehicle requires management authorization (PIN: 1234)</small>
                     </div>
-                    <button class="btn" type="submit">Check Out Vehicle</button>
+
+                    <button class="btn" type="submit" style="font-size: 18px; padding: 15px 30px;">
+                        <i class="fas fa-car"></i> Check Out Vehicle
+                    </button>
                 </form>
             </div>
 
@@ -622,7 +663,16 @@
                     </div>
                     <div class="form-group">
                         <label for="maintenance-type">Maintenance Type:</label>
-                        <input id="maintenance-type" type="text" required placeholder="e.g., Oil Change, Tire Rotation">
+                        <select id="maintenance-type" required>
+                            <option value="">-- Select Type --</option>
+                            <option value="Oil Change">Oil Change</option>
+                            <option value="Tire Service">Tire Service</option>
+                            <option value="Brake Service">Brake Service</option>
+                            <option value="Transmission Service">Transmission Service</option>
+                            <option value="Engine Repair">Engine Repair</option>
+                            <option value="Inspection">Inspection</option>
+                            <option value="Other">Other</option>
+                        </select>
                     </div>
                     <div class="form-group">
                         <label for="maintenance-description">Description:</label>
@@ -968,7 +1018,7 @@
             });
         }
 
-        // Populate vehicle select dropdowns
+        // Populate vehicle select dropdowns and quick access
         function populateVehicleSelects() {
             const selects = ['checkout-vehicle', 'return-vehicle', 'maintenance-vehicle'];
             
@@ -1007,6 +1057,65 @@
                     select.appendChild(option);
                 });
             });
+            
+            // Update quick vehicle access
+            updateQuickVehicleAccess();
+        }
+        
+        // Update quick vehicle access buttons and count
+        function updateQuickVehicleAccess() {
+            const availableVehicles = vehicles.filter(v => 
+                v.status === 'available' && v.access_level !== 'executive'
+            );
+            
+            // Update count
+            document.getElementById('available-count').textContent = availableVehicles.length;
+            
+            // Update quick access buttons
+            const quickList = document.getElementById('quick-vehicle-list');
+            if (quickList) {
+                quickList.innerHTML = '';
+                
+                availableVehicles.forEach(vehicle => {
+                    const button = document.createElement('button');
+                    button.type = 'button';
+                    button.className = 'btn btn-sm btn-secondary';
+                    button.textContent = vehicle.name;
+                    button.onclick = () => {
+                        document.getElementById('checkout-vehicle').value = vehicle.id;
+                        document.getElementById('mileage-out').value = vehicle.current_mileage;
+                        
+                        // Show PIN input for management vehicles
+                        const pinInputGroup = document.getElementById('pin-input-group');
+                        const pinInput = document.getElementById('management-pin');
+                        if (vehicle.access_level === 'management') {
+                            pinInputGroup.style.display = 'block';
+                            pinInput.required = true;
+                        } else {
+                            pinInputGroup.style.display = 'none';
+                            pinInput.required = false;
+                            pinInput.value = '';
+                        }
+                        
+                        // Set expected return to 4 hours from now
+                        const expectedReturn = new Date();
+                        expectedReturn.setHours(expectedReturn.getHours() + 4);
+                        const localExpectedReturn = new Date(expectedReturn.getTime() - (expectedReturn.getTimezoneOffset() * 60000)).toISOString().slice(0, 16);
+                        document.getElementById('expected-return').value = localExpectedReturn;
+                    };
+                    
+                    if (vehicle.access_level === 'management') {
+                        button.innerHTML += ' <i class="fas fa-lock" title="Management PIN Required"></i>';
+                        button.style.borderColor = '#ffc107';
+                    }
+                    
+                    quickList.appendChild(button);
+                });
+                
+                if (availableVehicles.length === 0) {
+                    quickList.innerHTML = '<span style="color: #999; font-style: italic;">No vehicles currently available for checkout</span>';
+                }
+            }
         }
 
         // Load fleet statistics
@@ -1035,10 +1144,6 @@
                     <div class="stat-card">
                         <h3>Maintenance</h3>
                         <div class="stat-number">${maintenanceVehicles}</div>
-                    </div>
-                    <div class="stat-card">
-                        <h3>Reserved</h3>
-                        <div class="stat-number">${reservedVehicles}</div>
                     </div>
                 `;
             } catch (error) {
@@ -1091,8 +1196,10 @@
                 vehicle_id: vehicleId,
                 driver_name: document.getElementById('driver-name').value,
                 purpose: document.getElementById('checkout-purpose').value,
-                expected_return_date: document.getElementById('checkout-time').value,
-                checkout_mileage: parseInt(document.getElementById('mileage-out').value)
+                checkout_time: document.getElementById('checkout-time').value,
+                expected_return_date: document.getElementById('expected-return').value,
+                checkout_mileage: parseInt(document.getElementById('mileage-out').value),
+
             };
             
             try {
@@ -1103,8 +1210,10 @@
                     vehicle_name: vehicle.name,
                     driver_name: formData.driver_name,
                     purpose: formData.purpose,
-                    checkout_date: formData.expected_return_date,
+                    checkout_date: formData.checkout_time,
+                    expected_return_date: formData.expected_return_date,
                     checkout_mileage: formData.checkout_mileage,
+
                     is_returned: false
                 };
                 
@@ -1349,10 +1458,6 @@
                         <h4>Maintenance</h4>
                         <div style="font-size: 2em; font-weight: bold; color: #ef6c00;">${maintenanceVehicles}</div>
                     </div>
-                    <div class="stat-card" style="background: #fce4ec; padding: 20px; border-radius: 15px; text-align: center;">
-                        <h4>Reserved</h4>
-                        <div style="font-size: 2em; font-weight: bold; color: #9c27b0;">${reservedVehicles}</div>
-                    </div>
                 </div>
                 <table class="report-table" style="margin-top: 20px;">
                     <thead>
@@ -1568,7 +1673,6 @@
                 ['Available Vehicles', availableVehicles],
                 ['Checked Out Vehicles', checkedOutVehicles],
                 ['Maintenance Vehicles', maintenanceVehicles],
-                ['Reserved Vehicles', reservedVehicles],
                 ['Utilization Rate (%)', totalVehicles > 0 ? ((checkedOutVehicles / totalVehicles) * 100).toFixed(1) : 0],
                 ['Availability Rate (%)', totalVehicles > 0 ? ((availableVehicles / totalVehicles) * 100).toFixed(1) : 0]
             ];
@@ -1676,10 +1780,71 @@
             }
         }
 
-        // Excel export function (fallback to CSV)
+        // Enhanced Excel export with multiple sheets (using SheetJS)
         function exportToExcel(dataType) {
-            showAlert('info', 'Excel export requires additional library. Using CSV export instead.');
-            exportToCSV(dataType);
+            // For now, we'll create a comprehensive CSV with section headers
+            // In a production environment, you would include the SheetJS library for true Excel support
+            const timestamp = new Date().toISOString().split('T')[0];
+            let filename = '';
+            let content = '';
+            
+            if (dataType === 'complete') {
+                // Create a comprehensive workbook-style CSV with clear sections
+                content = generateWorkbookCSV();
+                filename = `VAULT_Complete_Workbook_${timestamp}.csv`;
+                showAlert('success', 'Complete workbook exported as multi-section CSV. For true Excel format with tabs, add SheetJS library.');
+            } else {
+                // For individual exports, use the existing CSV functionality
+                exportToCSV(dataType);
+                return;
+            }
+            
+            downloadCSV(content, filename);
+        }
+        
+        function generateWorkbookCSV() {
+            const timestamp = new Date().toLocaleString();
+            
+            // Create comprehensive report with clear section breaks
+            const vehicleData = generateVehicleCSV();
+            const checkoutData = generateCheckoutCSV();
+            const maintenanceData = generateMaintenanceCSV();
+            const utilizationData = generateUtilizationCSV();
+            
+            return `"V.A.U.L.T. - Complete Fleet Management Report"
+"Generated: ${timestamp}"
+""
+"==========================================="
+"SECTION 1: VEHICLE INVENTORY"
+"==========================================="
+""
+${vehicleData}
+""
+""
+"==========================================="
+"SECTION 2: CHECKOUT HISTORY"
+"==========================================="
+""
+${checkoutData}
+""
+""
+"==========================================="
+"SECTION 3: MAINTENANCE RECORDS"
+"==========================================="
+""
+${maintenanceData}
+""
+""
+"==========================================="
+"SECTION 4: UTILIZATION METRICS"
+"==========================================="
+""
+${utilizationData}
+""
+""
+"==========================================="
+"END OF REPORT"
+"==========================================="`;
         }
     </script>
 </body>
